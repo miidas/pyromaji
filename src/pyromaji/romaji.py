@@ -1,3 +1,5 @@
+import string
+
 _HAN_ZEN = {
   '!':'！',
   '"':'＂',
