@@ -13,3 +13,6 @@ from pyromaji import romaji
 # きょうはいいてんきだ
 romaji.conv("kyouhaiitennkida")
 ```
+
+## Performance
+![](doc/performance.png)
