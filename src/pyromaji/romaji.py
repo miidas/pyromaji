@@ -137,7 +137,6 @@ _ROMAJI = {
               'fya':'ふゃ','fyi':'ふぃ','fyu':'ふゅ','fye':'ふぇ','fyo':'ふょ',
               'jya':'じゃ','jyi':'じぃ','jyu':'じゅ','jye':'じぇ','jyo':'じょ',
               'cya':'ちゃ','cyi':'ちぃ','cyu':'ちゅ','cye':'ちぇ','cyo':'ちょ',
-              
               'lya':'ゃ','lyi':'ぃ','lyu':'ゅ','lye':'ぇ','lyo':'ょ',
               'xya':'ゃ','xyi':'ぃ','xyu':'ゅ','xye':'ぇ','xyo':'ょ',
               'xa':'ぁ','xi':'ぃ','xu':'ぅ','xe':'ぇ','xo':'ぉ',
@@ -150,14 +149,20 @@ _ROMAJI = {
               'wyi':'ゐ','wye':'ゑ',
 }
 
+_VOWEL = {
+    'a', 'i', 'u', 'e', 'o'
+}
+
+_ASCII_LOWER = dict.fromkeys(string.ascii_lowercase)
+
 def conv(text, strict=False):
   #DEBUG = False
   #DEBUG = True
-
   text_len = len(text) # テキスト長
   text_pos = 0 # 現在位置
   state = 0 # 状態
-  hiragana_txt = '' # 変換済みテキスト
+  hiragana_txt = [] # 変換済みテキスト
+  hira_append = hiragana_txt.append
 
   while text_len > text_pos:
     c = text[text_pos]
@@ -166,76 +171,74 @@ def conv(text, strict=False):
 
     # 1文字目の処理
     if state == 0:
-      if c == 'a' or c == 'i' or c == 'u' or c == 'e' or c == 'o':
-        hiragana_txt += _ROMAJI[c]
-      #elif c == '-': hiragana_txt += 'ー'
-      #elif c == ',': hiragana_txt += '、'
-      #elif c == '.': hiragana_txt += '。'
+      if c in _VOWEL:
+        hira_append(_ROMAJI[c])
       else:
         state = 1
     # 2文字目の処理
     elif state == 1:
-      prev_c = text[text_pos - 1]
-      if c == 'a' or c == 'i' or c == 'u' or c == 'e' or c == 'o':
-        text_tmp = prev_c+c
+      prev_c = text[text_pos-1]
+      if c in _VOWEL:
+        text_tmp = text[text_pos-1:text_pos+1]
         if text_tmp in _ROMAJI:
-          hiragana_txt += _ROMAJI[prev_c+c]
+          hira_append(_ROMAJI[text_tmp])
           state = 0
         else:
           # 変換失敗
           #if DEBUG: print(f'FAIL: state == {state}: {c}')
-          hiragana_txt += _HAN_ZEN[prev_c]
-          text_pos -= 1
+          hira_append(_HAN_ZEN[prev_c])
           state = 0
+          continue
       elif prev_c == 'n' and c == 'n':
-        hiragana_txt += 'ん'
+        hira_append('ん')
         state = 0
       elif prev_c == c:
         # `っ`の特殊処理
-        oc = ord(c)
-        if c != 'q' and (0x41 <= oc <= 0x41+25 or 0x61 <= oc <= 0x61+25):
-          hiragana_txt += 'っ'
-          text_pos -= 1
+        if c != 'q' and c in _ASCII_LOWER:
+          hira_append('っ')
           state = 0
+          continue
         else:
           state = 2
       else:
         state = 2
     # 3文字目の処理
     elif state == 2:
-      if c == 'a' or c == 'i' or c == 'u' or c == 'e' or c == 'o':
+      if c in _VOWEL:
         text_tmp = text[text_pos-2:text_pos+1]
-
         if text_tmp in _ROMAJI:
-          hiragana_txt += _ROMAJI[text_tmp]
+          hira_append(_ROMAJI[text_tmp])
           state = 0
         else:
           pprev_c = text[text_pos - 2]
+          text_tmp2 = text_tmp[1:]
           # `ん`の特殊処理
           if pprev_c == 'n':
-            hiragana_txt += 'ん'
-            if text_tmp[1:] in _ROMAJI:
-              hiragana_txt += _ROMAJI[text_tmp[1:]]
+            hira_append('ん')
+            if text_tmp in _ROMAJI:
+              hira_append(_ROMAJI[text_tmp])
               state = 0
             else:
               # 変換失敗
               #if DEBUG: print(f'FAIL1: state == {state}')
-              text_pos -= 2
+              text_pos -= 1
               state = 0
+              continue
           else:
             # 変換失敗
-            pprev_c = text[text_pos - 2]
             #if DEBUG: print(f'FAIL2: state == {state}')
-            hiragana_txt += _HAN_ZEN[pprev_c]
-            text_pos -= 2
+            hira_append(_HAN_ZEN[pprev_c])
+            text_pos -= 1
             state = 0
+            continue
       else:
         # 変換失敗
         #if DEBUG: print(f'FAIL3: state == {state}')
-        text_tmp = text[text_pos - 2]
-        hiragana_txt += 'ん' if text_tmp == 'n' else _HAN_ZEN[text_tmp]
+        text_tmp = text[text_pos-2]
+        hira_append('ん' if text_tmp == 'n' else _HAN_ZEN[text_tmp])
         state = 0
-        text_pos -= 2
+        text_pos -= 1
+        continue
 
     text_pos += 1
     #if DEBUG: print(f'Hira: {hiragana_txt}')
@@ -244,12 +247,11 @@ def conv(text, strict=False):
   if state != 0:
     #if DEBUG: print(f'REM: state == {state}')
     c = text[text_pos-1]
-
     if state == 1:
-      hiragana_txt += 'ん' if c == 'n' and not strict else _HAN_ZEN[c]
+      hira_append('ん' if c == 'n' and not strict else _HAN_ZEN[c])
     elif state == 2:
-      prev_c = text[text_pos - 2]
-      hiragana_txt += 'ん' if prev_c == 'n' and c != 'y' else _HAN_ZEN[prev_c]
-      hiragana_txt += _HAN_ZEN[c]
+      prev_c = text[text_pos-2]
+      hira_append('ん' if prev_c == 'n' and c != 'y' else _HAN_ZEN[prev_c])
+      hira_append(_HAN_ZEN[c])
 
-  return hiragana_txt
+  return ''.join(hiragana_txt)
